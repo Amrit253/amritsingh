@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Morse Code Studio & Audio Decoder</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- QRCode.js for instant QR generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81',
+            },
+            accent: {
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+            }
+          },
+          fontFamily: {
+            mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.4);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(99, 102, 241, 0.4);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(99, 102, 241, 0.7);
+    }
+    .signal-active {
+      box-shadow: 0 0 30px rgba(99, 102, 241, 0.9), 0 0 55px rgba(56, 189, 248, 0.7);
+      transform: scale(1.1);
+    }
+    .torch-active {
+      box-shadow: 0 0 35px rgba(250, 204, 21, 0.9), 0 0 70px rgba(234, 179, 8, 0.8);
+      background-color: #fef08a !important;
+      border-color: #eab308 !important;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+  <!-- Toast Notification Container -->
+  <div id="toast" class="fixed top-5 right-5 z-50 transform translate-y-[-120%] opacity-0 transition-all duration-300 pointer-events-none bg-slate-900/95 border border-indigo-500/40 text-slate-100 px-4 py-3 rounded-xl shadow-2xl backdrop-blur-md flex items-center gap-3 text-sm font-medium">
+    <i data-lucide="info" id="toast-icon" class="w-5 h-5 text-indigo-400"></i>
+    <span id="toast-message">Notification</span>
+  </div>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col gap-6 sm:gap-8">
+    <!-- Top Navigation / Header -->
+    <header class="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-sky-400 p-[1px] flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-2xl flex items-center justify-center">
+            <i data-lucide="radio" class="w-6 h-6 text-indigo-400"></i>
+          </div>
+        </div>
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent">
+            Morse Code Studio
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-400">
+            Translator • Audio Decoder • Camera Flash Torch • Audio WAV Export • QR Share
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Actions Header Buttons -->
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <button id="open-share-btn" class="flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 text-slate-300 hover:text-white transition-all shadow-sm">
+          <i data-lucide="share-2" class="w-4 h-4 text-sky-400"></i>
+          <span>Share & QR</span>
+        </button>
+        <button id="toggle-sheet-btn" class="flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-all shadow-sm">
+          <i data-lucide="book-open" class="w-4 h-4 text-indigo-400"></i>
+          <span>Cheat Sheet</span>
+        </button>
+        <button id="sample-sos-btn" class="flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl bg-slate-900 border border-slate-800 hover:border-indigo-500/50 text-slate-300 hover:text-indigo-300 transition-all">
+          <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+          <span>Sample SOS</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs (Translator vs Audio Decoder) -->
+    <div class="flex border-b border-slate-800 gap-4">
+      <button id="tab-translator-btn" class="pb-3 px-2 text-sm font-semibold border-b-2 border-indigo-500 text-white flex items-center gap-2 transition-all">
+        <i data-lucide="languages" class="w-4 h-4 text-indigo-400"></i>
+        <span>Translator & Audio Player</span>
+      </button>
+      <button id="tab-decoder-btn" class="pb-3 px-2 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-all">
+        <i data-lucide="ear" class="w-4 h-4 text-emerald-400"></i>
+        <span>Audio-to-Morse Decoder</span>
+      </button>
+    </div>
+
+    <!-- MAIN VIEW 1: Translator & Synthesizer -->
+    <div id="view-translator" class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Primary Translation Deck (8 Columns) -->
+      <section class="lg:col-span-8 flex flex-col gap-5">
+        
+        <!-- Mode Switcher Banner -->
+        <div class="flex items-center justify-between bg-slate-900/80 border border-slate-800/80 backdrop-blur rounded-2xl p-2.5 sm:p-3">
+          <div class="flex items-center gap-2 pl-2">
+            <span class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Mode:</span>
+            <span id="mode-display-badge" class="px-3 py-1 rounded-lg bg-indigo-950/80 text-indigo-300 text-xs sm:text-sm font-semibold border border-indigo-800/50">
+              Text &rarr; Morse Code
+            </span>
+          </div>
+
+          <button id="swap-mode-btn" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs sm:text-sm font-semibold transition-all shadow-lg shadow-indigo-600/25">
+            <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+            <span>Swap Direction</span>
+          </button>
+        </div>
+
+        <!-- Input Card -->
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col gap-3 shadow-xl relative backdrop-blur-sm">
+          <div class="flex items-center justify-between text-xs sm:text-sm text-slate-400">
+            <span id="input-label" class="font-medium text-slate-200 flex items-center gap-2">
+              <i data-lucide="type" class="w-4 h-4 text-indigo-400"></i>
+              Plain English / Word Input
+            </span>
+            <div class="flex items-center gap-3">
+              <span id="input-counter" class="text-xs text-slate-500 font-mono">0 chars</span>
+              <button id="clear-input-btn" title="Clear text" class="text-slate-400 hover:text-rose-400 p-1 rounded-lg transition-colors">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <textarea
+            id="source-input"
+            rows="4"
+            class="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl p-3.5 text-slate-100 placeholder-slate-600 text-sm sm:text-base outline-none resize-y transition-all font-mono"
+            placeholder="Type your message here (e.g., Hello World or Morse dots/dashes)..."
+          ></textarea>
+
+          <!-- Quick Morse Input Buttons -->
+          <div id="morse-pad" class="hidden flex flex-wrap items-center gap-2 pt-1">
+            <span class="text-xs text-slate-500 font-medium">Quick Keys:</span>
+            <button id="insert-dot-btn" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 font-mono text-sm rounded-lg border border-slate-700 active:scale-95 transition-all">• Dot (.)</button>
+            <button id="insert-dash-btn" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 font-mono text-sm rounded-lg border border-slate-700 active:scale-95 transition-all">— Dash (-)</button>
+            <button id="insert-char-space-btn" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-sm rounded-lg border border-slate-700 active:scale-95 transition-all">Letter Gap</button>
+            <button id="insert-word-sep-btn" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-sm rounded-lg border border-slate-700 active:scale-95 transition-all">Word Gap (/)</button>
+          </div>
+        </div>
+
+        <!-- Output Card -->
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-5 flex flex-col gap-3 shadow-xl backdrop-blur-sm">
+          <div class="flex items-center justify-between text-xs sm:text-sm text-slate-400">
+            <span id="output-label" class="font-medium text-slate-200 flex items-center gap-2">
+              <i data-lucide="binary" class="w-4 h-4 text-sky-400"></i>
+              Morse Code Result
+            </span>
+            <div class="flex items-center gap-2">
+              <button id="copy-output-btn" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-700 transition-all active:scale-95">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span>Copy</span>
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="target-output"
+            class="min-h-[100px] max-h-[200px] overflow-y-auto w-full bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 text-slate-100 font-mono text-base tracking-widest break-words leading-relaxed select-all selection:bg-indigo-500/40"
+          >
+            <!-- Translated Morse or Text appears here -->
+          </div>
+
+          <!-- Audio & Visualizer Panel -->
+          <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-800/80">
+            <!-- Audio Indicator Light & Play Controls -->
+            <div class="flex items-center gap-3">
+              <!-- Visual Beep Indicator Bulb -->
+              <div id="signal-bulb" title="Audio/Light pulse" class="w-7 h-7 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center transition-all duration-75">
+                <span class="w-2.5 h-2.5 rounded-full bg-slate-600 transition-all duration-75" id="bulb-dot"></span>
+              </div>
+              
+              <button id="play-audio-btn" class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-emerald-600/20 disabled:opacity-50 disabled:pointer-events-none">
+                <i data-lucide="play" class="w-4 h-4"></i>
+                <span>Listen Audio</span>
+              </button>
+
+              <button id="stop-audio-btn" disabled class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-500/30 text-xs sm:text-sm font-semibold transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none">
+                <i data-lucide="square" class="w-4 h-4"></i>
+                <span>Stop</span>
+              </button>
+            </div>
+
+            <!-- Download Audio Button -->
+            <button id="download-wav-btn" class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-500 hover:to-sky-500 text-white text-xs sm:text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-indigo-600/20">
+              <i data-lucide="download" class="w-4 h-4"></i>
+              <span>Download Beep (WAV)</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Sidebar Controls: Flashlight, Pitch & Speed -->
+      <aside class="lg:col-span-4 flex flex-col gap-5">
+        
+        <!-- Mobile Camera Flashlight Integration Card -->
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-3.5 shadow-xl backdrop-blur-sm">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+              <i data-lucide="flashlight" class="w-4 h-4 text-amber-400"></i>
+              Camera Flashlight Sync
+            </h2>
+            <span id="torch-status-pill" class="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono">Disabled</span>
+          </div>
+
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Synchronizes your mobile camera's real LED flashlight to flash in rhythm with dots & dashes during audio playback.
+          </p>
+
+          <div class="flex items-center justify-between bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+            <div class="flex flex-col">
+              <span class="text-xs font-semibold text-slate-200">Enable Camera Flash</span>
+              <span class="text-[10px] text-slate-500" id="torch-support-text">Requires camera permission on mobile</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="torch-toggle" class="sr-only peer">
+              <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+            </label>
+          </div>
+          
+          <div id="torch-alert-box" class="hidden text-[11px] p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 leading-snug"></div>
+        </div>
+
+        <!-- Tone & Speed Configuration -->
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-4 shadow-xl backdrop-blur-sm">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+              <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+              Tone & Speed
+            </h2>
+            <button id="reset-audio-settings-btn" class="text-xs text-slate-400 hover:text-indigo-300 transition-colors">
+              Reset
+            </button>
+          </div>
+
+          <!-- Speed Slider (WPM) -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between text-xs font-medium">
+              <span class="text-slate-300">Speed (WPM):</span>
+              <span id="wpm-display" class="font-mono text-indigo-400">18 WPM</span>
+            </div>
+            <input
+              type="range"
+              id="wpm-slider"
+              min="5"
+              max="35"
+              value="18"
+              step="1"
+              class="w-full accent-indigo-500 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
+            />
+            <div class="flex justify-between text-[10px] text-slate-500">
+              <span>Slow (5)</span>
+              <span>Default (18)</span>
+              <span>Fast (35)</span>
+            </div>
+          </div>
+
+          <!-- Pitch Slider (Frequency in Hz) -->
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between text-xs font-medium">
+              <span class="text-slate-300">Tone Frequency:</span>
+              <span id="freq-display" class="font-mono text-sky-400">650 Hz</span>
+            </div>
+            <input
+              type="range"
+              id="freq-slider"
+              min="350"
+              max="1100"
+              value="650"
+              step="25"
+              class="w-full accent-sky-500 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
+            />
+            <div class="flex justify-between text-[10px] text-slate-500">
+              <span>Low (350Hz)</span>
+              <span>Standard (650Hz)</span>
+              <span>High (1100Hz)</span>
+            </div>
+          </div>
+
+          <!-- Audio Waveform selector -->
+          <div class="flex flex-col gap-1.5 pt-1">
+            <span class="text-xs text-slate-300 font-medium">Oscillator Waveform:</span>
+            <div class="grid grid-cols-3 gap-2">
+              <button data-wave="sine" class="wave-btn active px-2.5 py-1.5 text-xs font-medium rounded-lg border border-indigo-500 bg-indigo-600/30 text-indigo-200 transition-all text-center">Sine</button>
+              <button data-wave="square" class="wave-btn px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-700 bg-slate-800 text-slate-300 transition-all text-center">Square</button>
+              <button data-wave="triangle" class="wave-btn px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-700 bg-slate-800 text-slate-300 transition-all text-center">Triangle</button>
+            </div>
+          </div>
+        </div>
+
+      </aside>
+    </div>
+
+    <!-- MAIN VIEW 2: Audio-to-Morse Decoder View -->
+    <div id="view-decoder" class="hidden grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- Audio Upload & Live Mic Input Card -->
+      <section class="lg:col-span-6 flex flex-col gap-5">
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-4 shadow-xl backdrop-blur-sm">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+              <i data-lucide="file-audio" class="w-4 h-4 text-emerald-400"></i>
+              Audio Input for Decoding
+            </h2>
+            <span class="text-xs text-slate-500 font-mono">WAV / MP3 / OGG</span>
+          </div>
+
+          <!-- Drag and Drop Dropzone -->
+          <div id="drop-zone" class="border-2 border-dashed border-slate-700 hover:border-emerald-500/70 bg-slate-950/60 rounded-xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3">
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <p class="text-sm font-medium text-slate-200">Click to upload or drag audio file here</p>
+              <p class="text-xs text-slate-500 mt-1">Upload a recording of Morse beeps</p>
+            </div>
+            <input type="file" id="audio-file-input" accept="audio/*" class="hidden" />
+          </div>
+
+          <div class="flex items-center justify-center text-xs text-slate-500 uppercase tracking-widest">— OR RECORD LIVE —</div>
+
+          <!-- Mic Record Button -->
+          <div class="flex gap-2">
+            <button id="mic-record-btn" class="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium border border-slate-700 transition-all active:scale-95">
+              <i data-lucide="mic" class="w-4 h-4 text-rose-400"></i>
+              <span id="mic-record-label">Record Live Audio Beep</span>
+            </button>
+            <button id="mic-stop-btn" disabled class="hidden px-4 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-sm font-medium transition-all active:scale-95">
+              <i data-lucide="square" class="w-4 h-4"></i>
+              <span>Stop & Decode</span>
+            </button>
+          </div>
+
+          <!-- Decoder Sensitivity Parameters -->
+          <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800 flex flex-col gap-2">
+            <div class="flex justify-between text-xs">
+              <span class="text-slate-400">Detection Volume Threshold:</span>
+              <span id="threshold-val" class="font-mono text-emerald-400">18%</span>
+            </div>
+            <input type="range" id="threshold-slider" min="5" max="60" value="18" class="w-full accent-emerald-500 bg-slate-800 h-1.5 rounded-lg cursor-pointer">
+          </div>
+        </div>
+      </section>
+
+      <!-- Decoded Results Card -->
+      <section class="lg:col-span-6 flex flex-col gap-5">
+        <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 flex flex-col gap-4 shadow-xl backdrop-blur-sm">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+              <i data-lucide="check-check" class="w-4 h-4 text-emerald-400"></i>
+              Decoded Output
+            </h2>
+            <span id="decoder-status" class="text-xs text-slate-500 font-mono">Idle</span>
+          </div>
+
+          <!-- Detected Morse Sequence -->
+          <div>
+            <span class="text-xs text-slate-400 block mb-1.5 font-medium">Detected Dots & Dashes:</span>
+            <div id="decoded-morse-output" class="min-h-[70px] bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-slate-200 font-mono text-sm break-all leading-relaxed">
+              Upload or record Morse audio to decode...
+            </div>
+          </div>
+
+          <!-- Decoded Plain Text Result -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs text-slate-400 font-medium">Decoded English Text:</span>
+              <button id="send-to-translator-btn" class="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1">
+                <span>Send to Translator</span>
+                <i data-lucide="arrow-right" class="w-3 h-3"></i>
+              </button>
+            </div>
+            <div id="decoded-text-output" class="min-h-[90px] bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-white font-mono text-base font-semibold break-words leading-relaxed select-all">
+              Awaiting audio input...
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- MODAL 1: QR Code & Direct Share Modal -->
+    <div id="share-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 flex flex-col gap-5 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="qr-code" class="w-5 h-5 text-sky-400"></i>
+            <h3 class="font-bold text-lg text-white">Share Morse & QR Code</h3>
+          </div>
+          <button id="close-share-modal-btn" class="text-slate-400 hover:text-white p-1 rounded-lg">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Generated QR Canvas Container -->
+        <div class="flex flex-col items-center justify-center gap-3">
+          <div id="qrcode-container" class="bg-white p-3 rounded-2xl shadow-lg shadow-sky-500/10 flex items-center justify-center">
+            <!-- QR renders here -->
+          </div>
+          <span class="text-xs text-slate-400 text-center">Scan to open or read translated Morse message</span>
+        </div>
+
+        <!-- Share Actions -->
+        <div class="flex flex-col gap-2.5">
+          <button id="native-share-btn" class="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition-all active:scale-95 shadow-md shadow-indigo-600/20">
+            <i data-lucide="share" class="w-4 h-4"></i>
+            <span>Share via Apps (WhatsApp / Messages)</span>
+          </button>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="copy-share-url-btn" class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-all">
+              <i data-lucide="link" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>Copy Link</span>
+            </button>
+            <button id="download-qr-btn" class="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-all">
+              <i data-lucide="image-down" class="w-3.5 h-3.5 text-sky-400"></i>
+              <span>Download QR</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 2: Cheat Sheet Modal -->
+    <div id="cheat-sheet-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        
+        <!-- Modal Header -->
+        <div class="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="book-open" class="w-5 h-5 text-indigo-400"></i>
+            <h3 class="font-bold text-base sm:text-lg text-white">International Morse Code Alphabet & Numbers</h3>
+          </div>
+          <button id="close-cheat-sheet-btn" class="text-slate-400 hover:text-white p-1 rounded-lg transition-colors">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <!-- Cheat Sheet Grid -->
+        <div class="p-5 overflow-y-auto space-y-6">
+          <div>
+            <h4 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-3">Letters (A - Z)</h4>
+            <div id="cheat-letters-grid" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2"></div>
+          </div>
+          <div>
+            <h4 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-3">Numbers (0 - 9)</h4>
+            <div id="cheat-numbers-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2"></div>
+          </div>
+          <div>
+            <h4 class="text-xs uppercase tracking-wider text-slate-400 font-semibold mb-3">Punctuation & Symbols</h4>
+            <div id="cheat-symbols-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2"></div>
+          </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-800 bg-slate-950/40 text-center text-xs text-slate-500">
+          Click on any character to append it directly into your input box.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // International Morse Code Dictionary
+    const MORSE_MAP = {
+      'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
+      'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
+      'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
+      'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+      'Y': '-.--', 'Z': '--..',
+      '0': '-----', '1': '.----', '2': '..---', '3': '...--', '4': '....-',
+      '5': '.....', '6': '-....', '7': '--...', '8': '---..', '9': '----.',
+      '.': '.-.-.-', ',': '--..--', '?': '..--..', '\'': '.----.', '!': '-.-.--',
+      '/': '-..-.', '(': '-.--.', ')': '-.--.-', '&': '.-...', ':': '---...',
+      ';': '-.-.-.', '=': '-...-', '+': '.-.-.', '-': '-....-', '_': '..--.-',
+      '"': '.-..-.', '$': '...-..-', '@': '.--.-.'
+    };
+
+    // Reverse Dictionary (Morse to Char)
+    const REVERSE_MORSE_MAP = {};
+    for (const [char, code] of Object.entries(MORSE_MAP)) {
+      REVERSE_MORSE_MAP[code] = char;
+    }
+
+    // Application State
+    const state = {
+      mode: 'TEXT_TO_MORSE', // 'TEXT_TO_MORSE' or 'MORSE_TO_TEXT'
+      wpm: 18,
+      frequency: 650,
+      waveType: 'sine',
+      isPlaying: false,
+      stopRequested: false,
+      torchEnabled: false,
+      torchTrack: null,
+      torchStream: null,
+      qrInstance: null
+    };
+
+    // DOM Elements - Translator
+    const sourceInput = document.getElementById('source-input');
+    const targetOutput = document.getElementById('target-output');
+    const inputLabel = document.getElementById('input-label');
+    const outputLabel = document.getElementById('output-label');
+    const modeBadge = document.getElementById('mode-display-badge');
+    const swapModeBtn = document.getElementById('swap-mode-btn');
+    const clearInputBtn = document.getElementById('clear-input-btn');
+    const copyOutputBtn = document.getElementById('copy-output-btn');
+    const inputCounter = document.getElementById('input-counter');
+    const morsePad = document.getElementById('morse-pad');
+
+    const playAudioBtn = document.getElementById('play-audio-btn');
+    const stopAudioBtn = document.getElementById('stop-audio-btn');
+    const downloadWavBtn = document.getElementById('download-wav-btn');
+    const signalBulb = document.getElementById('signal-bulb');
+    const bulbDot = document.getElementById('bulb-dot');
+
+    const wpmSlider = document.getElementById('wpm-slider');
+    const wpmDisplay = document.getElementById('wpm-display');
+    const freqSlider = document.getElementById('freq-slider');
+    const freqDisplay = document.getElementById('freq-display');
+    const waveButtons = document.querySelectorAll('.wave-btn');
+    const resetAudioSettingsBtn = document.getElementById('reset-audio-settings-btn');
+
+    // Camera Torch DOM
+    const torchToggle = document.getElementById('torch-toggle');
+    const torchStatusPill = document.getElementById('torch-status-pill');
+    const torchAlertBox = document.getElementById('torch-alert-box');
+
+    // Tabs & Decoder DOM
+    const tabTranslatorBtn = document.getElementById('tab-translator-btn');
+    const tabDecoderBtn = document.getElementById('tab-decoder-btn');
+    const viewTranslator = document.getElementById('view-translator');
+    const viewDecoder = document.getElementById('view-decoder');
+
+    const dropZone = document.getElementById('drop-zone');
+    const audioFileInput = document.getElementById('audio-file-input');
+    const micRecordBtn = document.getElementById('mic-record-btn');
+    const micStopBtn = document.getElementById('mic-stop-btn');
+    const micRecordLabel = document.getElementById('mic-record-label');
+    const thresholdSlider = document.getElementById('threshold-slider');
+    const thresholdVal = document.getElementById('threshold-val');
+    const decodedMorseOutput = document.getElementById('decoded-morse-output');
+    const decodedTextOutput = document.getElementById('decoded-text-output');
+    const decoderStatus = document.getElementById('decoder-status');
+    const sendToTranslatorBtn = document.getElementById('send-to-translator-btn');
+
+    // Share & Cheat Sheet Modals
+    const shareModal = document.getElementById('share-modal');
+    const openShareBtn = document.getElementById('open-share-btn');
+    const closeShareModalBtn = document.getElementById('close-share-modal-btn');
+    const qrcodeContainer = document.getElementById('qrcode-container');
+    const nativeShareBtn = document.getElementById('native-share-btn');
+    const copyShareUrlBtn = document.getElementById('copy-share-url-btn');
+    const downloadQrBtn = document.getElementById('download-qr-btn');
+
+    const cheatSheetModal = document.getElementById('cheat-sheet-modal');
+    const toggleSheetBtn = document.getElementById('toggle-sheet-btn');
+    const closeCheatSheetBtn = document.getElementById('close-cheat-sheet-btn');
+    const sampleSosBtn = document.getElementById('sample-sos-btn');
+
+    // Audio Context
+    let audioCtx = null;
+    let activeOscillator = null;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    function textToMorse(text) {
+      const clean = text.toUpperCase().trim();
+      if (!clean) return '';
+      const words = clean.split(/\s+/);
+      return words.map(word => {
+        return word.split('').map(ch => MORSE_MAP[ch] || ch).join(' ');
+      }).join(' / ');
+    }
+
+    function morseToText(morse) {
+      const clean = morse.trim();
+      if (!clean) return '';
+      const words = clean.split(/\s*\/\s*|\s{3,}/);
+      return words.map(word => {
+        const letters = word.trim().split(/\s+/);
+        return letters.map(code => REVERSE_MORSE_MAP[code] || (code === '' ? '' : '#')).join('');
+      }).join(' ');
+    }
+
+    function updateTranslation() {
+      const input = sourceInput.value;
+      inputCounter.textContent = `${input.length} chars`;
+
+      if (state.mode === 'TEXT_TO_MORSE') {
+        const morseResult = textToMorse(input);
+        targetOutput.textContent = morseResult || 'Morse code will display here...';
+      } else {
+        const textResult = morseToText(input);
+        targetOutput.textContent = textResult || 'Translated plain text will display here...';
+      }
+    }
+
+    function getCurrentMorseCode() {
+      if (state.mode === 'TEXT_TO_MORSE') {
+        return textToMorse(sourceInput.value);
+      } else {
+        return sourceInput.value.trim();
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-message');
+      toastMsg.textContent = msg;
+      toast.classList.remove('translate-y-[-120%]', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-[-120%]', 'opacity-0');
+      }, 2500);
+    }
+
+    // Flashlight (Torch API) controller
+    async function initCameraTorch() {
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Camera API not supported in this browser.');
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'environment' }
+        });
+        const track = stream.getVideoTracks()[0];
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+
+        if (!capabilities.torch) {
+          torchAlertBox.textContent = 'Note: Camera found, but Hardware Flashlight (Torch) is not supported by your browser or device.';
+          torchAlertBox.classList.remove('hidden');
+        } else {
+          torchAlertBox.classList.add('hidden');
+        }
+
+        state.torchStream = stream;
+        state.torchTrack = track;
+        state.torchEnabled = true;
+        torchStatusPill.textContent = 'Active (Ready)';
+        torchStatusPill.className = 'text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono';
+        showToast('Camera flashlight enabled & ready');
+      } catch (err) {
+        console.warn('Torch initialization error:', err);
+        state.torchEnabled = false;
+        torchToggle.checked = false;
+        torchStatusPill.textContent = 'Disabled';
+        torchAlertBox.textContent = 'Could not access mobile flashlight: ' + err.message;
+        torchAlertBox.classList.remove('hidden');
+      }
+    }
+
+    function stopCameraTorch() {
+      if (state.torchTrack) {
+        try {
+          state.torchTrack.applyConstraints({ advanced: [{ torch: false }] });
+          state.torchTrack.stop();
+        } catch (e) {}
+        state.torchTrack = null;
+      }
+      if (state.torchStream) {
+        try {
+          state.torchStream.getTracks().forEach(t => t.stop());
+        } catch (e) {}
+        state.torchStream = null;
+      }
+      state.torchEnabled = false;
+      torchStatusPill.textContent = 'Disabled';
+      torchStatusPill.className = 'text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-mono';
+      torchAlertBox.classList.add('hidden');
+    }
+
+    async function setTorchHardware(stateOn) {
+      if (!state.torchEnabled || !state.torchTrack) return;
+      try {
+        await state.torchTrack.applyConstraints({
+          advanced: [{ torch: stateOn }]
+        });
+      } catch (e) {
+        // Silently catch if unsupported hardware
+      }
+    }
+
+    function setLight(active) {
+      if (active) {
+        signalBulb.classList.add('signal-active', 'border-sky-400', 'bg-sky-950');
+        bulbDot.classList.remove('bg-slate-600');
+        bulbDot.classList.add('bg-sky-400');
+        if (state.torchEnabled) {
+          setTorchHardware(true);
+          signalBulb.classList.add('torch-active');
+        }
+      } else {
+        signalBulb.classList.remove('signal-active', 'border-sky-400', 'bg-sky-950', 'torch-active');
+        bulbDot.classList.remove('bg-sky-400');
+        bulbDot.classList.add('bg-slate-600');
+        if (state.torchEnabled) {
+          setTorchHardware(false);
+        }
+      }
+    }
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    function getUnitDuration() {
+      return 1.2 / state.wpm;
+    }
+
+    async function playMorseTone(durationMs) {
+      if (state.stopRequested) return;
+      const ctx = getAudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = state.waveType;
+      osc.frequency.setValueAtTime(state.frequency, ctx.currentTime);
+
+      const now = ctx.currentTime;
+      const fadeTime = 0.005;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.3, now + fadeTime);
+      gain.gain.setValueAtTime(0.3, now + (durationMs / 1000) - fadeTime);
+      gain.gain.linearRampToValueAtTime(0, now + (durationMs / 1000));
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      activeOscillator = osc;
+
+      osc.start(now);
+      setLight(true);
+      osc.stop(now + (durationMs / 1000));
+
+      await sleep(durationMs);
+      setLight(false);
+    }
+
+    async function startPlayback() {
+      const morse = getCurrentMorseCode();
+      if (!morse || morse === 'Morse code will display here...') {
+        showToast('No Morse code to play!');
+        return;
+      }
+
+      state.isPlaying = true;
+      state.stopRequested = false;
+      playAudioBtn.disabled = true;
+      stopAudioBtn.disabled = false;
+
+      const unit = getUnitDuration() * 1000;
+      const dotTime = unit;
+      const dashTime = unit * 3;
+      const intraCharPause = unit;
+      const letterPause = unit * 3;
+      const wordPause = unit * 7;
+
+      const tokens = morse.split('');
+      for (let i = 0; i < tokens.length; i++) {
+        if (state.stopRequested) break;
+        const symbol = tokens[i];
+
+        if (symbol === '.') {
+          await playMorseTone(dotTime);
+          await sleep(intraCharPause);
+        } else if (symbol === '-' || symbol === '—') {
+          await playMorseTone(dashTime);
+          await sleep(intraCharPause);
+        } else if (symbol === ' ') {
+          if (tokens[i + 1] === '/' || tokens[i - 1] === '/') continue;
+          await sleep(letterPause);
+        } else if (symbol === '/') {
+          await sleep(wordPause);
+        }
+      }
+
+      stopPlayback();
+    }
+
+    function stopPlayback() {
+      state.stopRequested = true;
+      state.isPlaying = false;
+      setLight(false);
+      try {
+        if (activeOscillator) {
+          activeOscillator.stop();
+          activeOscillator.disconnect();
+          activeOscillator = null;
+        }
+      } catch (e) {}
+      playAudioBtn.disabled = false;
+      stopAudioBtn.disabled = true;
+    }
+
+    function createWavFile(morseStr, sampleRate = 44100, freq = 650, wpm = 18) {
+      const unit = 1.2 / wpm;
+      const dotTime = unit;
+      const dashTime = unit * 3;
+      const intraCharPause = unit;
+      const letterPause = unit * 3;
+      const wordPause = unit * 7;
+
+      const segments = [];
+      const tokens = morseStr.split('');
+
+      for (let i = 0; i < tokens.length; i++) {
+        const symbol = tokens[i];
+        if (symbol === '.') {
+          segments.push({ tone: true, duration: dotTime });
+          segments.push({ tone: false, duration: intraCharPause });
+        } else if (symbol === '-' || symbol === '—') {
+          segments.push({ tone: true, duration: dashTime });
+          segments.push({ tone: false, duration: intraCharPause });
+        } else if (symbol === ' ') {
+          if (tokens[i + 1] === '/' || tokens[i - 1] === '/') continue;
+          segments.push({ tone: false, duration: letterPause });
+        } else if (symbol === '/') {
+          segments.push({ tone: false, duration: wordPause });
+        }
+      }
+
+      const totalDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
+      const totalSamples = Math.ceil(totalDuration * sampleRate);
+      const buffer = new Float32Array(totalSamples);
+
+      let samplePointer = 0;
+      for (const seg of segments) {
+        const segSamples = Math.floor(seg.duration * sampleRate);
+        if (seg.tone) {
+          const fadeSamples = Math.min(Math.floor(sampleRate * 0.005), Math.floor(segSamples / 4));
+          for (let s = 0; s < segSamples; s++) {
+            let env = 1.0;
+            if (s < fadeSamples) env = s / fadeSamples;
+            else if (s > segSamples - fadeSamples) env = (segSamples - s) / fadeSamples;
+
+            const t = (samplePointer + s) / sampleRate;
+            let sampleVal = Math.sin(2 * Math.PI * freq * t);
+            if (state.waveType === 'triangle') {
+              sampleVal = (2 / Math.PI) * Math.asin(Math.sin(2 * Math.PI * freq * t));
+            } else if (state.waveType === 'square') {
+              sampleVal = Math.sin(2 * Math.PI * freq * t) >= 0 ? 0.7 : -0.7;
+            }
+            buffer[samplePointer + s] = sampleVal * env * 0.4;
+          }
+        }
+        samplePointer += segSamples;
+      }
+
+      const wavHeaderSize = 44;
+      const byteLength = totalSamples * 2;
+      const wavBuffer = new ArrayBuffer(wavHeaderSize + byteLength);
+      const view = new DataView(wavBuffer);
+
+      const writeString = (offset, str) => {
+        for (let i = 0; i < str.length; i++) {
+          view.setUint8(offset + i, str.charCodeAt(i));
+        }
+      };
+
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + byteLength, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(36, 'data');
+      view.setUint32(40, byteLength, true);
+
+      let offset = 44;
+      for (let i = 0; i < totalSamples; i++) {
+        let s = Math.max(-1, Math.min(1, buffer[i]));
+        view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        offset += 2;
+      }
+
+      return new Blob([view], { type: 'audio/wav' });
+    }
+
+    function downloadMorseAudio() {
+      const morse = getCurrentMorseCode();
+      if (!morse || morse === 'Morse code will display here...') {
+        showToast('Enter text or Morse first to download!');
+        return;
+      }
+
+      try {
+        const blob = createWavFile(morse, 44100, state.frequency, state.wpm);
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.style.display = 'none';
+        anchor.href = url;
+        anchor.download = `morse_audio_${state.wpm}wpm_${state.frequency}hz.wav`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        setTimeout(() => {
+          document.body.removeChild(anchor);
+          URL.revokeObjectURL(url);
+        }, 300);
+        showToast('Audio WAV downloaded!');
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to generate audio WAV.');
+      }
+    }
+
+    async function decodeAudioBuffer(audioBuffer) {
+      decoderStatus.textContent = 'Analyzing audio...';
+      const channelData = audioBuffer.getChannelData(0);
+      const sampleRate = audioBuffer.sampleRate;
+      const frameSize = Math.floor(sampleRate * 0.015); // 15ms windows
+      const numFrames = Math.floor(channelData.length / frameSize);
+
+      const thresholdPercentage = parseInt(thresholdSlider.value) / 100;
+      
+      // Calculate RMS power across all frames to find peak
+      const energies = new Float32Array(numFrames);
+      let maxEnergy = 0;
+      for (let i = 0; i < numFrames; i++) {
+        let sum = 0;
+        const start = i * frameSize;
+        for (let j = 0; j < frameSize; j++) {
+          const val = channelData[start + j];
+          sum += val * val;
+        }
+        const rms = Math.sqrt(sum / frameSize);
+        energies[i] = rms;
+        if (rms > maxEnergy) maxEnergy = rms;
+      }
+
+      if (maxEnergy < 0.005) {
+        decoderStatus.textContent = 'Failed';
+        decodedMorseOutput.textContent = 'No clear beep tones detected in audio.';
+        decodedTextOutput.textContent = 'Audio is too quiet or empty.';
+        return;
+      }
+
+      const cutoff = maxEnergy * thresholdPercentage;
+      const stateFrames = []; // true = tone active, false = silence
+
+      for (let i = 0; i < numFrames; i++) {
+        stateFrames.push(energies[i] >= cutoff);
+      }
+
+      // Group consecutive frame states into durations (ms)
+      const durations = [];
+      let currentVal = stateFrames[0];
+      let currentCount = 0;
+
+      for (let i = 0; i < stateFrames.length; i++) {
+        if (stateFrames[i] === currentVal) {
+          currentCount++;
+        } else {
+          durations.push({
+            isTone: currentVal,
+            durationMs: (currentCount * frameSize / sampleRate) * 1000
+          });
+          currentVal = stateFrames[i];
+          currentCount = 1;
+        }
+      }
+      if (currentCount > 0) {
+        durations.push({
+          isTone: currentVal,
+          durationMs: (currentCount * frameSize / sampleRate) * 1000
+        });
+      }
+
+      // Filter out tiny acoustic noises < 25ms
+      const cleaned = durations.filter(d => d.durationMs > 25);
+      const toneDurations = cleaned.filter(d => d.isTone).map(d => d.durationMs);
+
+      if (toneDurations.length === 0) {
+        decoderStatus.textContent = 'Failed';
+        decodedMorseOutput.textContent = 'No valid tone intervals found.';
+        decodedTextOutput.textContent = 'Could not isolate dots or dashes.';
+        return;
+      }
+
+      // Estimate shortest tone as base dot duration
+      toneDurations.sort((a, b) => a - b);
+      const shortestTones = toneDurations.slice(0, Math.max(1, Math.floor(toneDurations.length * 0.35)));
+      const baseDotMs = shortestTones.reduce((a, b) => a + b, 0) / shortestTones.length;
+      const dotDashThreshold = baseDotMs * 2.0;
+
+      let morseResult = '';
+      for (let i = 0; i < cleaned.length; i++) {
+        const seg = cleaned[i];
+        if (seg.isTone) {
+          if (seg.durationMs < dotDashThreshold) {
+            morseResult += '.';
+          } else {
+            morseResult += '-';
+          }
+        } else {
+          // Silence segment: pause classification
+          if (seg.durationMs >= baseDotMs * 4.5) {
+            morseResult += ' / ';
+          } else if (seg.durationMs >= baseDotMs * 1.8) {
+            morseResult += ' ';
+          }
+        }
+      }
+
+      // Clean multiple spaces and slashes
+      const cleanMorse = morseResult.replace(/\s+/g, ' ').replace(/\s*\/\s*/g, ' / ').trim();
+      decodedMorseOutput.textContent = cleanMorse || 'None detected';
+      
+      const translatedText = morseToText(cleanMorse);
+      decodedTextOutput.textContent = translatedText || '(Undecoded text)';
+      decoderStatus.textContent = 'Decoded successfully';
+      showToast('Audio file decoded into Morse code!');
+    }
+
+    async function handleAudioFile(file) {
+      try {
+        decoderStatus.textContent = 'Loading audio...';
+        const arrayBuffer = await file.arrayBuffer();
+        const ctx = getAudioContext();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        await decodeAudioBuffer(audioBuffer);
+      } catch (err) {
+        console.error(err);
+        decoderStatus.textContent = 'Error';
+        showToast('Error reading audio file format.');
+      }
+    }
+
+    // Microphone Recording for live decoding
+    let mediaRecorder = null;
+    let recordedChunks = [];
+
+    async function startMicRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordedChunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+          const arrayBuffer = await blob.arrayBuffer();
+          const ctx = getAudioContext();
+          const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          await decodeAudioBuffer(audioBuffer);
+        };
+
+        mediaRecorder.start();
+        micRecordBtn.classList.add('hidden');
+        micStopBtn.classList.remove('hidden');
+        decoderStatus.textContent = 'Recording live mic...';
+        showToast('Listening to microphone beeps...');
+      } catch (err) {
+        console.error(err);
+        showToast('Microphone access denied: ' + err.message);
+      }
+    }
+
+    function stopMicRecording() {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        micStopBtn.classList.add('hidden');
+        micRecordBtn.classList.remove('hidden');
+      }
+    }
+
+    function openShareModal() {
+      const morse = getCurrentMorseCode();
+      const text = sourceInput.value.trim();
+
+      const shareContent = (text ? `Text: ${text}\n` : '') + `Morse: ${morse}`;
+      qrcodeContainer.innerHTML = '';
+
+      // Initialize QRCode
+      state.qrInstance = new QRCode(qrcodeContainer, {
+        text: shareContent || 'https://en.wikipedia.org/wiki/Morse_code',
+        width: 180,
+        height: 180,
+        colorDark: '#090d16',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+
+      shareModal.classList.remove('hidden');
+    }
+
+    async function handleNativeShare() {
+      const morse = getCurrentMorseCode();
+      const text = sourceInput.value.trim();
+      const shareData = {
+        title: 'Morse Code Message',
+        text: `Message: "${text}"\nMorse: ${morse}`,
+        url: window.location.href
+      };
+
+      if (navigator.share) {
+        try {
+          await navigator.share(shareData);
+          showToast('Shared successfully!');
+        } catch (err) {
+          if (err.name !== 'AbortError') showToast('Could not share.');
+        }
+      } else {
+        // Fallback copy to clipboard
+        copyTextToClipboard(shareData.text);
+        showToast('Copied full message to clipboard!');
+      }
+    }
+
+    function copyTextToClipboard(text) {
+      const dummy = document.createElement('textarea');
+      dummy.value = text;
+      document.body.appendChild(dummy);
+      dummy.select();
+      document.execCommand('copy');
+      document.body.removeChild(dummy);
+    }
+
+    function downloadQrImage() {
+      const img = qrcodeContainer.querySelector('img');
+      const canvas = qrcodeContainer.querySelector('canvas');
+      let dataUrl = null;
+
+      if (img && img.src) {
+        dataUrl = img.src;
+      } else if (canvas) {
+        dataUrl = canvas.toDataURL('image/png');
+      }
+
+      if (dataUrl) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = 'morse_code_qr.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast('QR Code image downloaded!');
+      } else {
+        showToast('QR code rendering, try again in a moment');
+      }
+    }
+
+    function buildCheatSheet() {
+      const lettersGrid = document.getElementById('cheat-letters-grid');
+      const numbersGrid = document.getElementById('cheat-numbers-grid');
+      const symbolsGrid = document.getElementById('cheat-symbols-grid');
+
+      const createCard = (char, code) => {
+        const btn = document.createElement('button');
+        btn.className = 'flex flex-col items-center justify-center p-2 rounded-xl bg-slate-800/70 hover:bg-indigo-600/30 border border-slate-700/60 hover:border-indigo-500/50 transition-all active:scale-95 group text-center';
+        btn.innerHTML = `
+          <span class="text-sm font-bold text-white group-hover:text-indigo-300">${char}</span>
+          <span class="text-xs font-mono text-slate-400 tracking-wider group-hover:text-sky-300">${code}</span>
+        `;
+        btn.addEventListener('click', () => {
+          if (state.mode === 'TEXT_TO_MORSE') {
+            sourceInput.value += char;
+          } else {
+            sourceInput.value += (sourceInput.value.length ? ' ' : '') + code;
+          }
+          updateTranslation();
+          showToast(`Appended: ${char} (${code})`);
+        });
+        return btn;
+      };
+
+      for (let i = 65; i <= 90; i++) {
+        const ch = String.fromCharCode(i);
+        lettersGrid.appendChild(createCard(ch, MORSE_MAP[ch]));
+      }
+
+      for (let i = 0; i <= 9; i++) {
+        const ch = String(i);
+        numbersGrid.appendChild(createCard(ch, MORSE_MAP[ch]));
+      }
+
+      const symbols = ['.', ',', '?', '\'', '!', '/', '(', ')', '&', ':', ';', '=', '+', '-', '_', '"', '$', '@'];
+      symbols.forEach(sym => {
+        if (MORSE_MAP[sym]) {
+          symbolsGrid.appendChild(createCard(sym, MORSE_MAP[sym]));
+        }
+      });
+    }
+
+    // Tab Navigation Logic
+    tabTranslatorBtn.addEventListener('click', () => {
+      tabTranslatorBtn.className = 'pb-3 px-2 text-sm font-semibold border-b-2 border-indigo-500 text-white flex items-center gap-2 transition-all';
+      tabDecoderBtn.className = 'pb-3 px-2 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-all';
+      viewTranslator.classList.remove('hidden');
+      viewDecoder.classList.add('hidden');
+    });
+
+    tabDecoderBtn.addEventListener('click', () => {
+      tabDecoderBtn.className = 'pb-3 px-2 text-sm font-semibold border-b-2 border-emerald-500 text-white flex items-center gap-2 transition-all';
+      tabTranslatorBtn.className = 'pb-3 px-2 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center gap-2 transition-all';
+      viewDecoder.classList.remove('hidden');
+      viewTranslator.classList.add('hidden');
+    });
+
+    // Event Listeners - Translator Controls
+    sourceInput.addEventListener('input', updateTranslation);
+
+    swapModeBtn.addEventListener('click', () => {
+      stopPlayback();
+      const currentTarget = targetOutput.textContent.trim();
+      const currentSource = sourceInput.value.trim();
+
+      if (state.mode === 'TEXT_TO_MORSE') {
+        state.mode = 'MORSE_TO_TEXT';
+        modeBadge.innerHTML = 'Morse Code &rarr; Plain Text';
+        inputLabel.innerHTML = '<i data-lucide="binary" class="w-4 h-4 text-sky-400"></i> Morse Code Input (• and —)';
+        outputLabel.innerHTML = '<i data-lucide="type" class="w-4 h-4 text-indigo-400"></i> Plain Text Result';
+        sourceInput.placeholder = 'Type dots (.) and dashes (-) with spaces between letters and / between words...';
+        morsePad.classList.remove('hidden');
+        sourceInput.value = (currentTarget && !currentTarget.includes('will display here')) ? currentTarget : '';
+      } else {
+        state.mode = 'TEXT_TO_MORSE';
+        modeBadge.innerHTML = 'Text &rarr; Morse Code';
+        inputLabel.innerHTML = '<i data-lucide="type" class="w-4 h-4 text-indigo-400"></i> Plain English / Word Input';
+        outputLabel.innerHTML = '<i data-lucide="binary" class="w-4 h-4 text-sky-400"></i> Morse Code Result';
+        sourceInput.placeholder = 'Type your message here (e.g., Hello World or Morse dots/dashes)...';
+        morsePad.classList.add('hidden');
+        sourceInput.value = (currentTarget && !currentTarget.includes('will display here')) ? currentTarget : '';
+      }
+      lucide.createIcons();
+      updateTranslation();
+    });
+
+    clearInputBtn.addEventListener('click', () => {
+      sourceInput.value = '';
+      updateTranslation();
+      sourceInput.focus();
+    });
+
+    copyOutputBtn.addEventListener('click', () => {
+      const content = targetOutput.textContent.trim();
+      if (!content || content.includes('will display here')) {
+        showToast('Nothing to copy yet!');
+        return;
+      }
+      copyTextToClipboard(content);
+      showToast('Copied to clipboard!');
+    });
+
+    // Quick Keys
+    document.getElementById('insert-dot-btn').addEventListener('click', () => {
+      sourceInput.value += '.';
+      updateTranslation();
+    });
+    document.getElementById('insert-dash-btn').addEventListener('click', () => {
+      sourceInput.value += '-';
+      updateTranslation();
+    });
+    document.getElementById('insert-char-space-btn').addEventListener('click', () => {
+      sourceInput.value += ' ';
+      updateTranslation();
+    });
+    document.getElementById('insert-word-sep-btn').addEventListener('click', () => {
+      sourceInput.value += ' / ';
+      updateTranslation();
+    });
+
+    // Audio adjustments
+    wpmSlider.addEventListener('input', (e) => {
+      state.wpm = parseInt(e.target.value);
+      wpmDisplay.textContent = `${state.wpm} WPM`;
+    });
+
+    freqSlider.addEventListener('input', (e) => {
+      state.frequency = parseInt(e.target.value);
+      freqDisplay.textContent = `${state.frequency} Hz`;
+    });
+
+    waveButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        waveButtons.forEach(b => {
+          b.classList.remove('border-indigo-500', 'bg-indigo-600/30', 'text-indigo-200');
+          b.classList.add('border-slate-700', 'bg-slate-800', 'text-slate-300');
+        });
+        btn.classList.remove('border-slate-700', 'bg-slate-800', 'text-slate-300');
+        btn.classList.add('border-indigo-500', 'bg-indigo-600/30', 'text-indigo-200');
+        state.waveType = btn.getAttribute('data-wave');
+      });
+    });
+
+    resetAudioSettingsBtn.addEventListener('click', () => {
+      state.wpm = 18;
+      state.frequency = 650;
+      wpmSlider.value = 18;
+      freqSlider.value = 650;
+      wpmDisplay.textContent = '18 WPM';
+      freqDisplay.textContent = '650 Hz';
+      showToast('Audio settings reset');
+    });
+
+    // Flashlight Toggle
+    torchToggle.addEventListener('change', async (e) => {
+      if (e.target.checked) {
+        await initCameraTorch();
+      } else {
+        stopCameraTorch();
+      }
+    });
+
+    playAudioBtn.addEventListener('click', startPlayback);
+    stopAudioBtn.addEventListener('click', stopPlayback);
+    downloadWavBtn.addEventListener('click', downloadMorseAudio);
+
+    // Audio Decoder File Handlers
+    dropZone.addEventListener('click', () => audioFileInput.click());
+    audioFileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        handleAudioFile(e.target.files[0]);
+      }
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('border-emerald-500', 'bg-emerald-950/20');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('border-emerald-500', 'bg-emerald-950/20');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('border-emerald-500', 'bg-emerald-950/20');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        handleAudioFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    micRecordBtn.addEventListener('click', startMicRecording);
+    micStopBtn.addEventListener('click', stopMicRecording);
+
+    thresholdSlider.addEventListener('input', (e) => {
+      thresholdVal.textContent = `${e.target.value}%`;
+    });
+
+    sendToTranslatorBtn.addEventListener('click', () => {
+      const decodedText = decodedTextOutput.textContent.trim();
+      if (decodedText && decodedText !== 'Awaiting audio input...' && !decodedText.includes('Could not')) {
+        tabTranslatorBtn.click();
+        state.mode = 'TEXT_TO_MORSE';
+        sourceInput.value = decodedText;
+        updateTranslation();
+        showToast('Sent to translator!');
+      } else {
+        showToast('No valid decoded text to transfer');
+      }
+    });
+
+    // Share Modal
+    openShareBtn.addEventListener('click', openShareModal);
+    closeShareModalBtn.addEventListener('click', () => shareModal.classList.add('hidden'));
+    shareModal.addEventListener('click', (e) => {
+      if (e.target === shareModal) shareModal.classList.add('hidden');
+    });
+    nativeShareBtn.addEventListener('click', handleNativeShare);
+    copyShareUrlBtn.addEventListener('click', () => {
+      copyTextToClipboard(window.location.href);
+      showToast('Page URL copied to clipboard!');
+    });
+    downloadQrBtn.addEventListener('click', downloadQrImage);
+
+    // Modal controls
+    toggleSheetBtn.addEventListener('click', () => cheatSheetModal.classList.remove('hidden'));
+    closeCheatSheetBtn.addEventListener('click', () => cheatSheetModal.classList.add('hidden'));
+    cheatSheetModal.addEventListener('click', (e) => {
+      if (e.target === cheatSheetModal) cheatSheetModal.classList.add('hidden');
+    });
+
+    // Sample SOS Preset
+    sampleSosBtn.addEventListener('click', () => {
+      if (state.mode === 'TEXT_TO_MORSE') {
+        sourceInput.value = 'SOS MAYDAY';
+      } else {
+        sourceInput.value = '... --- ... / -- .- -.-- -.. .- -.--';
+      }
+      updateTranslation();
+      showToast('Loaded sample emergency SOS');
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      buildCheatSheet();
+      sourceInput.value = 'HELLO WORLD';
+      updateTranslation();
+    });
+  </script>
+</body>
+</html>
